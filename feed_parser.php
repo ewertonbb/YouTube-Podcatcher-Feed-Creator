@@ -38,28 +38,50 @@
  * filling in 'contentDetails' for part and the username in 'forUsername' to get
  * the playlist ID for an uploads playlist
  */ 
+
 $api_key = ''; // get this from google
-$playlist_id = '';
-$my_title = 'Title'; // plain text
-$my_description = 'Description'; // plain text
-$my_link = 'http://www.youtube.com/user/username/'; // full URL to show homepage 
 $my_install_url = 'http://exmple.com/yt/'; // url where script is installed
 
+//*****************************************************************************************************
+if(isset($_REQUEST['user'])) { // enter youtube username from http://exmple.com/yt/feed_parser.php?user=EXAMPLE
+$youtube_user = $_REQUEST['user'];
+$my_link = 'http://www.youtube.com/user/'.$youtube_user; // get URL to show homepage 
+include_once('curl.php');
+date_default_timezone_set('GMT'); // problem with timezone outside GMT, i am from brazil
+if($rs1 = curlGet('https://www.googleapis.com/youtube/v3/channels?part=contentDetails&forUsername='.$youtube_user.'&key='.$api_key) AND $rs2 = curlGet('https://www.googleapis.com/youtube/v3/channels?part=snippet&forUsername='.$youtube_user.'&key='.$api_key)) { 
+	
+	$response = json_decode($rs1);
+	foreach($response->items as $a) {
+		$item[] = $a; 
+	}  
+	$playlist_id = $item[0]->contentDetails->relatedPlaylists->uploads;
+	
+	$item = null;
+	$response = json_decode($rs2);
+	foreach($response->items as $a) {
+		$item[] = $a; 
+	} 
+	$my_title = $item[0]->snippet->title; //get title channel
+	$my_description = $item[0]->snippet->description; //get description channel
+	$itunes_image = $item[0]->snippet->thumbnails->medium->url; //get image/logo channel
+	
+} else { die('Error: feed not found for playlist id or other error occured'); } 
+
+
+//*****************************************************************************************************
 
 /* 
  * URL where your cron job will save the feed output - this is used for the 
  * atom self-reference in the feed and should match where the feed will be 
  */ 
-$my_feed_url = 'http://example.com/feed.xml'; 
-$itunes_image = 'http://example.com/photo.jpg';
+$my_feed_url = 'http://exmple.com/yt/feed.xml'; 
 
 /* nothing to configure below here */ 
 
-include_once('curl.php');
 $my_videos = array(); 
 
 // this gets a whole series of video IDs - what else do we need to gather? 
-if($rs = curlGet('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId='. $playlist_id .'&maxResults=50&fields=items&key='. $api_key)) {
+if($rs = curlGet('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId='. $playlist_id .'&maxResults=10&fields=items&key='. $api_key)) {
 	//var_dump($rs); 
 	$response = json_decode($rs);
 	foreach($response->items as $item) {
@@ -111,7 +133,7 @@ foreach ($my_videos as $entry) {
 	if ($item_description == '') {
 		$item_description = $entry->snippet->description;
 	}
-	/* not clear why, but sometimes there are blank entries, which we ignore */ 
+	// not clear why, but sometimes there are blank entries, which we ignore
 	if($item_title != '') {
 		$output .= "<item>
 			<pubDate>$pubDate</pubDate>
@@ -138,5 +160,5 @@ header("Content-Type: application/rss+xml");
 echo $output;
 
 /* end of main loop */ 
-
+}
 ?>
